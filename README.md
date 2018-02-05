@@ -1,5 +1,6 @@
 # DeshadowNet
-[CVPR2017] DeshadowNet implementation
+[CVPR2017] DeshadowNet: A Multi-context Embedding Deep Network for Shadow Removal<br />
+TensorFlow implementation<br />
 
 ## To Do
 This project is on going

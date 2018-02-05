@@ -11,7 +11,7 @@ IMAGE_SIZE = 224 # 64 128 224
 BATCH_SIZE = 4
 EPOCH = 500
 G_LEARNING_RATE = 1e-5 #1e-5
-LEARNING_RATE = 1e-2 #1e-4
+LEARNING_RATE = 1e-3 #1e-4
 MOMENTUM = 0.9
 
 log_path = './graph/logs' # path to tensorboard graph
@@ -22,7 +22,7 @@ tfrecord_name = 'data.tfrecord'
 
 '''
 How to use Tensorboard
-Run the command line: 
+Run the command line:
 > tensorboard --logdir=./graph/logs
 '''
 
@@ -72,7 +72,7 @@ def train(backupFlag):
     # setting random seed and reset graphs
     tf.set_random_seed(1111)
     tf.reset_default_graph()
-    
+
     #calc step number
     step_num = int(408 / BATCH_SIZE)
 
@@ -81,6 +81,7 @@ def train(backupFlag):
         shadow = tf.placeholder(tf.float32, [BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, 3], name ='Shadow_image')
         shadow_free = tf.placeholder(tf.float32,[BATCH_SIZE,IMAGE_SIZE,IMAGE_SIZE,3], name = 'Shadow_free_image')
         keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+        lr = tf.placeholder(tf.float32, name ='learn_rate')
     # init network model
     model = DeshadowNet(shadow, shadow_free, BATCH_SIZE,keep_prob)
 
@@ -102,16 +103,15 @@ def train(backupFlag):
 
         with tf.name_scope('Momentum_Opt'):
             print('init optimization')
-            opt = tf.train.MomentumOptimizer(LEARNING_RATE, MOMENTUM)
-            train_op = opt.minimize(model.loss)
+            opt_g = tf.train.MomentumOptimizer(G_LEARNING_RATE, MOMENTUM)
+            train_g_op = opt_g.minimize(model.loss, var_list = model.g_net_variables)
+            opt_a = tf.train.MomentumOptimizer(LEARNING_RATE, MOMENTUM)
+            train_as_op = opt_a.minimize(model.loss, var_list = model.a_net_variables)
+            opt_s = tf.train.MomentumOptimizer(LEARNING_RATE, MOMENTUM)
+            train_as_op = opt_s.minimize(model.loss, var_list = model.s_net_variables)
+            train_op = tf.group(train_g_op,train_as_op)
 
-        print('check if there is backup')
-        if backupFlag and tf.train.get_checkpoint_state('./backup'):
-            print('backup file loading ...')
-            saver = tf.train.Saver()
-            saver.restore(sess, './backup/latest')
-        else:
-            print('no backup ...')
+
 
         # loading dataset ...
         reader = tf.TFRecordReader()
@@ -132,11 +132,22 @@ def train(backupFlag):
         init_local_op = tf.local_variables_initializer()
         sess.run([init_op,init_local_op])
         threads = tf.train.start_queue_runners(coord = coord)
-        
+
         tf.summary.scalar('epoch',epoch)
+        tf.summary.scalar('loss',model.loss)
         summary_op = tf.summary.merge_all()
         print('start training ...')
         writer = tf.summary.FileWriter(log_path, graph=tf.get_default_graph())
+
+
+        print('check if there is backup')
+        if backupFlag and tf.train.get_checkpoint_state('./backup'):
+            print('backup file loading ...')
+            saver = tf.train.Saver()
+            saver.restore(sess, './backup/latest')
+        else:
+            print('no backup ...')
+
 
         try:
             while not coord.should_stop():
@@ -163,48 +174,51 @@ def train(backupFlag):
                                             feed_dict={
                                             shadow: img_input_seq,
                                             shadow_free:  img_gt_seq,
-                                            keep_prob: 0.5})
+                                            keep_prob: 0.5
+                                            })
                         # print('loss: {}'.format(loss))
                         loss_val += loss
                         # write log
                         writer.add_summary(summary, sess.run(epoch) * BATCH_SIZE + i)
-                        
 
-                        if i == floor(step_num/2) or i == (step_num -1):
+
+                        if i == int(step_num/2) or i == int(step_num -1):
                             A, S = sess.run([model.A_input,model.S_input],
                                     feed_dict={
                                     shadow: img_input_seq,
                                     shadow_free:  img_gt_seq,
-                                    keep_prob: 1.0})
+                                    keep_prob: 1.0
+                                    })
                             A.reshape([BATCH_SIZE,112,112,256])
-                            S.reshape([BATCH_SIZE,112,112,256])                           
+                            S.reshape([BATCH_SIZE,112,112,256])
                             #image_show(A[0,:,:,0])
-                            #image_show(A[0,:,:,0])                   
-                            np.savetxt('./G_Net_Output/A{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*BATCH_SIZE+i)), A[0,:,:,0], delimiter=',')   # X is an array
-                            np.savetxt('./G_Net_Output/S{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*BATCH_SIZE+i)), S[0,:,:,0], delimiter=',')   # X is an array
+                            #image_show(A[0,:,:,0])
+                            np.savetxt('./output/a_out/A{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num+i)), A[0,:,:,0], delimiter=',')   # X is an array
+                            np.savetxt('./output/s_out/S{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num+i)), S[0,:,:,0], delimiter=',')   # X is an array
+
+
+
                     print('total loss in one epoch: {}'.format(loss_val))
 
                     # check for validation
-
-
-
-
                     # find shadow matte
                     f_shadow_val, gt_shadow_val = sess.run([model.f_shadow,model.gt_shadow],
-                                            feed_dict={
-                                            shadow: img_input_seq,
-                                            shadow_free: img_gt_seq,
-                                            keep_prob: 1.0})
+                                                            feed_dict={
+                                                            shadow: img_input_seq,
+                                                            shadow_free: img_gt_seq,
+                                                            keep_prob: 1.0
+                                                            })
                     # find
                     out = f_shadow_val[0].astype(np.uint8)
                     gt = gt_shadow_val[0].astype(np.uint8)
-                    #image_show(out.astype(np.uint8))
-                    #image_show(gt.astype(np.uint8))
+                    np.savetxt('./output/f_shadow/f_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num+i)), out[:,:,0], delimiter=',')
+                    np.savetxt('./output/gt_shadow/gt_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num+i)), gt[:,:,0], delimiter=',')
 
-                    #np.savetxt('f_shadow.out', out[:,:,0], delimiter=',')
-                    #np.savetxt('gt_shadow.out', gt[:,:,0], delimiter=',')
-                    cv2.imwrite('./output/f_deshadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(out, cv2.COLOR_RGB2BGR))
-                    cv2.imwrite('./output/gt_deshadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(gt, cv2.COLOR_RGB2BGR))
+                    image_show(out)
+                    image_show(gt)
+
+                    cv2.imwrite('./output/f_shadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(out, cv2.COLOR_RGB2BGR))
+                    cv2.imwrite('./output/gt_shadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(gt, cv2.COLOR_RGB2BGR))
                     # saving data
                     saver = tf.train.Saver()
                     saver.save(sess, './backup/latest', write_meta_graph = False)
@@ -212,8 +226,8 @@ def train(backupFlag):
                         saver.save(sess,'./backup/fully_trained',write_meta_graph = False)
 
                     #summary = sess.run(summary_op)
-            
-                    
+
+
 
                 else:
                     print('breaking out of while loop ...')
@@ -245,4 +259,4 @@ def image_show(np_image):
 
 if __name__ == '__main__':
     # make_tfrecord()
-    train(False)
+    train(True)

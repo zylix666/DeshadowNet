@@ -47,6 +47,8 @@ Tensorflow
 #5. data generation
 #    - use python script to generate data within maya env
 
+MOMENTUM = 0.9
+
 class DeshadowNet:
     def __init__(self, x, deshadow_image, batch_size,keep_prob):
         self.batch_size = batch_size
@@ -62,7 +64,13 @@ class DeshadowNet:
 
         self.loss = self.loss_function(self.shadow_matte, self.gt_shadow_matte)
 
-        self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
+
+        self.g_net_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='G_Net')
+        self.a_net_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='A_Net')
+        self.s_net_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='S_Net')
+
+
+
 
     def G_Net(self,x,keep_prob):
         vgg = vgg16.Vgg16()
@@ -87,7 +95,7 @@ class DeshadowNet:
             # pool5
             with tf.variable_scope('pool2-1'):
                 conv2_1_output = max_pool_layer(x,[1,3,3,1],2)
-                
+
             print('conv2-1')
             print(sess.run(tf.shape(conv2_1_output)))
 

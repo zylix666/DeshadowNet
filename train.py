@@ -179,7 +179,7 @@ def train(backupFlag):
                         # print('loss: {}'.format(loss))
                         loss_val += loss
                         # write log
-                        writer.add_summary(summary, sess.run(epoch) * BATCH_SIZE + i)
+                        writer.add_summary(summary, (sess.run(epoch) -1)*step_num* BATCH_SIZE+i)
 
 
                         if i == int(step_num/2) or i == int(step_num -1):
@@ -193,8 +193,8 @@ def train(backupFlag):
                             S.reshape([BATCH_SIZE,112,112,256])
                             #image_show(A[0,:,:,0])
                             #image_show(A[0,:,:,0])
-                            np.savetxt('./output/a_out/A{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num+i)), A[0,:,:,0], delimiter=',')   # X is an array
-                            np.savetxt('./output/s_out/S{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num+i)), S[0,:,:,0], delimiter=',')   # X is an array
+                            np.savetxt('./output/a_out/A{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), A[0,:,:,0], delimiter=',')   # X is an array
+                            np.savetxt('./output/s_out/S{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), S[0,:,:,0], delimiter=',')   # X is an array
 
 
 
@@ -211,8 +211,8 @@ def train(backupFlag):
                     # find
                     out = f_shadow_val[0].astype(np.uint8)
                     gt = gt_shadow_val[0].astype(np.uint8)
-                    np.savetxt('./output/f_shadow/f_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num+i)), out[:,:,0], delimiter=',')
-                    np.savetxt('./output/gt_shadow/gt_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num+i)), gt[:,:,0], delimiter=',')
+                    np.savetxt('./output/f_shadow/f_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), out[:,:,0], delimiter=',')
+                    np.savetxt('./output/gt_shadow/gt_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), gt[:,:,0], delimiter=',')
 
                     image_show(out)
                     image_show(gt)

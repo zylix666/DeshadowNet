@@ -14,5 +14,5 @@ cv2
 ```
 
 ## forked code
-[vgg tensorflow](https://github.com/machrisaa/tensorflow-vgg)
-[tfboard](https://github.com/chiphuyen/stanford-tensorflow-tutorials)
+[vgg tensorflow](https://github.com/machrisaa/tensorflow-vgg)<br />
+[tfboard](https://github.com/chiphuyen/stanford-tensorflow-tutorials)<br />

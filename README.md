@@ -5,18 +5,18 @@
 This project is on going
 
 ### Prerequisites
-'''
+```
 tensorflow
-'''
-'''
+```
+```
 tensorboard
-'''
-'''
+```
+```
 PIL
-'''
-'''
+```
+```
 numpy
-'''
-'''
+```
+```
 cv2
-'''
+```

@@ -1,7 +1,7 @@
 # DeshadowNet
 [CVPR2017] DeshadowNet implementation
 
-##  TO DO
+## To Do
 This project is on going
 
 > weight decay<br />

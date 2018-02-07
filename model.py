@@ -62,7 +62,12 @@ class DeshadowNet:
         self.f_shadow = self.calcShadowImage(self.shadow_matte,deshadow_image)
         self.gt_shadow = self.calcShadowImage(self.gt_shadow_matte,deshadow_image)
 
+        #calcShadowFreeImage(self, shadow, matte)
+        self.f_shadowfree = self.calcShadowFreeImage(x,self.shadow_matte)
+        self.gt_shadowfree = self.calcShadowFreeImage(x,self.gt_shadow_matte)
+
         self.loss = self.loss_function(self.shadow_matte, self.gt_shadow_matte)
+        
 
 
         self.g_net_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='G_Net')
@@ -81,6 +86,7 @@ class DeshadowNet:
         return A_input, S_input
 
     def A_Net(self,x,G_input,keep_prob): # after conv3 in G_Net  256
+        x = rgb2bgr(x)
         print('making a-network')
         sess=tf.Session()
         with tf.variable_scope('A_Net'):
@@ -158,6 +164,7 @@ class DeshadowNet:
             # deconv
             with tf.variable_scope('deconv2-2'):
                 x = deconv_layer(x,[4,4,3,64],[self.batch_size,224,224,3],2)
+                x = tf.nn.relu(x)
             print('finishing a-network')
             print('deconv2-1')
             print(sess.run(tf.shape(x)))
@@ -165,6 +172,7 @@ class DeshadowNet:
         return x
 
     def S_Net(self,x,G_input,keep_prob): # after conv5 in G_Net 512
+        x = rgb2bgr(x)
         print('making s-network')
         sess = tf.Session()
         with tf.variable_scope('S_Net'):
@@ -240,6 +248,7 @@ class DeshadowNet:
             # deconv
             with tf.variable_scope('decov3-2'):
                 x = deconv_layer(x,[4,4,3,64],[self.batch_size,224,224,3],2)
+                x = tf.nn.relu(x)
             print('decov3-2')
             print(sess.run(tf.shape(x)))
         print('finishing s-network')
@@ -259,6 +268,12 @@ class DeshadowNet:
         with tf.variable_scope('Shadow_Img'):
             output = tf.multiply(deshadow,matte)
         return output
+
+    def calcShadowFreeImage(self, shadow, matte):
+        with tf.variable_scope('Shadow_Free_Img'):
+            matte_cliped = tf.clip_by_value(matte, 1e-10,255)
+            output = tf.divide(shadow,matte_cliped)        
+            return output
 
     def shadowMatte(self, A_input, S_input):
         with tf.variable_scope('F_Matte'):
@@ -287,6 +302,20 @@ class DeshadowNet:
 def image_show(np_image):
     img = Image.fromarray(np_image,'RGB')
     img.show()
+
+def rgb2bgr(x):
+    with tf.name_scope('rgb2bgr'):
+        red, green, blue = tf.split(axis=3, num_or_size_splits=3, value=x)
+        assert red.get_shape().as_list()[1:] == [224, 224, 1]
+        assert green.get_shape().as_list()[1:] == [224, 224, 1]
+        assert blue.get_shape().as_list()[1:] == [224, 224, 1]
+        bgr = tf.concat(axis=3, values=[
+            blue,
+            green,
+            red,
+        ])
+        assert bgr.get_shape().as_list()[1:] == [224, 224, 3]
+    return bgr
 
 # not using fc layers
 if False:

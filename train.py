@@ -8,10 +8,10 @@ from tfrecord_utils import *
 from tensorflow.python import debug as tf_debug
 
 IMAGE_SIZE = 224 # 64 128 224
-BATCH_SIZE = 4
+BATCH_SIZE = 3
 EPOCH = 500
-G_LEARNING_RATE = 1e-5 #1e-5
-LEARNING_RATE = 1e-3 #1e-4
+INIT_G_LEARNING_RATE = 1E-5 #1E-5
+INIT_LEARNING_RATE = 1E-4 #1E-4
 MOMENTUM = 0.9
 
 log_path = './graph/logs' # path to tensorboard graph
@@ -70,6 +70,10 @@ def make_tfrecord():
 
 def train(backupFlag):
     # setting random seed and reset graphs
+
+    G_LEARNING_RATE = 1e-5 #1e-5
+    LEARNING_RATE = 1e-4 #1e-4
+
     tf.set_random_seed(1111)
     tf.reset_default_graph()
 
@@ -81,7 +85,8 @@ def train(backupFlag):
         shadow = tf.placeholder(tf.float32, [BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, 3], name ='Shadow_image')
         shadow_free = tf.placeholder(tf.float32,[BATCH_SIZE,IMAGE_SIZE,IMAGE_SIZE,3], name = 'Shadow_free_image')
         keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-        lr = tf.placeholder(tf.float32, name ='learn_rate')
+        lr_g = tf.placeholder(tf.float32, name='learn_rate_g')
+        lr = tf.placeholder(tf.float32, name ='learn_rate_as')
     # init network model
     model = DeshadowNet(shadow, shadow_free, BATCH_SIZE,keep_prob)
 
@@ -103,14 +108,20 @@ def train(backupFlag):
 
         with tf.name_scope('Momentum_Opt'):
             print('init optimization')
-            opt_g = tf.train.MomentumOptimizer(G_LEARNING_RATE, MOMENTUM)
+            # opt_g = tf.train.MomentumOptimizer(G_LEARNING_RATE, MOMENTUM)
+            # train_g_op = opt_g.minimize(model.loss, var_list = model.g_net_variables)
+            # opt_a = tf.train.MomentumOptimizer(LEARNING_RATE, MOMENTUM)
+            # train_as_op = opt_a.minimize(model.loss, var_list = model.a_net_variables)
+            # opt_s = tf.train.MomentumOptimizer(LEARNING_RATE, MOMENTUM)
+            # train_as_op = opt_s.minimize(model.loss, var_list = model.s_net_variables)
+            # train_op = tf.group(train_g_op,train_as_op)
+            opt_g = tf.train.MomentumOptimizer(lr_g, MOMENTUM)
             train_g_op = opt_g.minimize(model.loss, var_list = model.g_net_variables)
-            opt_a = tf.train.MomentumOptimizer(LEARNING_RATE, MOMENTUM)
+            opt_a = tf.train.MomentumOptimizer(lr, MOMENTUM)
             train_as_op = opt_a.minimize(model.loss, var_list = model.a_net_variables)
-            opt_s = tf.train.MomentumOptimizer(LEARNING_RATE, MOMENTUM)
+            opt_s = tf.train.MomentumOptimizer(lr, MOMENTUM)
             train_as_op = opt_s.minimize(model.loss, var_list = model.s_net_variables)
             train_op = tf.group(train_g_op,train_as_op)
-
 
 
         # loading dataset ...
@@ -135,6 +146,9 @@ def train(backupFlag):
 
         tf.summary.scalar('epoch',epoch)
         tf.summary.scalar('loss',model.loss)
+        tf.summary.scalar('lr_as',lr)
+        tf.summary.scalar('lr_g',lr_g)
+
         summary_op = tf.summary.merge_all()
         print('start training ...')
         writer = tf.summary.FileWriter(log_path, graph=tf.get_default_graph())
@@ -174,7 +188,9 @@ def train(backupFlag):
                                             feed_dict={
                                             shadow: img_input_seq,
                                             shadow_free:  img_gt_seq,
-                                            keep_prob: 0.5
+                                            keep_prob: 0.5,
+                                            lr: LEARNING_RATE,
+                                            lr_g: G_LEARNING_RATE
                                             })
                         # print('loss: {}'.format(loss))
                         loss_val += loss
@@ -187,7 +203,9 @@ def train(backupFlag):
                                     feed_dict={
                                     shadow: img_input_seq,
                                     shadow_free:  img_gt_seq,
-                                    keep_prob: 1.0
+                                    keep_prob: 1.0,
+                                    lr: LEARNING_RATE,
+                                    lr_g:G_LEARNING_RATE
                                     })
                             A.reshape([BATCH_SIZE,112,112,256])
                             S.reshape([BATCH_SIZE,112,112,256])
@@ -202,15 +220,17 @@ def train(backupFlag):
 
                     # check for validation
                     # find shadow matte
-                    f_shadow_val, gt_shadow_val = sess.run([model.f_shadow,model.gt_shadow],
+                    f_shadow_free, gt_shadow_free = sess.run([model.f_shadowfree,model.gt_shadowfree],
                                                             feed_dict={
                                                             shadow: img_input_seq,
                                                             shadow_free: img_gt_seq,
-                                                            keep_prob: 1.0
+                                                            keep_prob: 1.0,
+                                                            lr: LEARNING_RATE,
+                                                            lr_g:G_LEARNING_RATE
                                                             })
                     # find
-                    out = f_shadow_val[0].astype(np.uint8)
-                    gt = gt_shadow_val[0].astype(np.uint8)
+                    out = f_shadow_free[0].astype(np.uint8)
+                    gt = gt_shadow_free[0].astype(np.uint8)
                     np.savetxt('./output/f_shadow/f_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), out[:,:,0], delimiter=',')
                     np.savetxt('./output/gt_shadow/gt_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), gt[:,:,0], delimiter=',')
 
@@ -226,6 +246,9 @@ def train(backupFlag):
                         saver.save(sess,'./backup/fully_trained',write_meta_graph = False)
 
                     #summary = sess.run(summary_op)
+                    # decay learning rate
+                    LEARNING_RATE = lr_decay(INIT_LEARNING_RATE, 1, sess.run(epoch))
+                    G_LEARNING_RATE = lr_decay(INIT_G_LEARNING_RATE, 1, sess.run(epoch))
 
 
 
@@ -257,6 +280,8 @@ def image_show(np_image):
     img = Image.fromarray(np_image,'RGB')
     img.show()
 
+def lr_decay(lr_input, decay_rate,num_epoch):
+    return lr_input / (1 + decay_rate*num_epoch)
 if __name__ == '__main__':
     # make_tfrecord()
     train(True)

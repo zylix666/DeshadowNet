@@ -24,10 +24,10 @@ def max_pool_layer(x,filtershape,stride):
     return tf.nn.max_pool(x, filtershape, [1, stride, stride, 1], padding ='SAME')
 
 def prelu(x):
-  alphas = tf.get_variable('alpha', x.get_shape()[-1],
+    with tf.variable_scope('prelu'):
+        alphas = tf.get_variable('alpha', x.get_shape()[-1],
                        initializer=tf.constant_initializer(0.0),
                         dtype=tf.float32)
-  pos = tf.nn.relu(x)
-  neg = alphas * (x - tf.abs(x)) * 0.5
-
-  return pos + neg
+        pos = tf.nn.relu(x)
+        neg = alphas * (x - tf.abs(x)) * 0.5
+        return pos + neg

@@ -23,70 +23,7 @@ class Vgg16:
         print("npy file loaded")
         # print(self.data_dict)
 
-    def build(self, rgb):
-        """
-        load variable from npy to build the VGG
-
-        :param rgb: rgb image [batch, height, width, 3] values scaled [0, 1]
-        """
-
-        start_time = time.time()
-        print("build model started")
-
-        #rgb_scaled = rgb * 255.0
-        # unnormalize rgb image
-        with tf.name_scope('unnorm_vgg_input'):
-            rgb_scaled = tf.scalar_mul(255.0,rgb)
-            # Convert RGB to BGR
-            red, green, blue = tf.split(axis=3, num_or_size_splits=3, value=rgb_scaled)
-            assert red.get_shape().as_list()[1:] == [224, 224, 1]
-            assert green.get_shape().as_list()[1:] == [224, 224, 1]
-            assert blue.get_shape().as_list()[1:] == [224, 224, 1]
-            bgr = tf.concat(axis=3, values=[
-                blue - VGG_MEAN[0],
-                green - VGG_MEAN[1],
-                red - VGG_MEAN[2],
-            ])
-            assert bgr.get_shape().as_list()[1:] == [224, 224, 3]
-
-        self.conv1_1 = self.conv_layer(bgr, "conv1_1")
-        self.conv1_2 = self.conv_layer(self.conv1_1, "conv1_2")
-        self.pool1 = self.max_pool(self.conv1_2, 'pool1')
-
-        self.conv2_1 = self.conv_layer(self.pool1, "conv2_1")
-        self.conv2_2 = self.conv_layer(self.conv2_1, "conv2_2")
-        self.pool2 = self.max_pool(self.conv2_2, 'pool2')
-
-        self.conv3_1 = self.conv_layer(self.pool2, "conv3_1")
-        self.conv3_2 = self.conv_layer(self.conv3_1, "conv3_2")
-        self.conv3_3 = self.conv_layer(self.conv3_2, "conv3_3")
-        self.pool3 = self.max_pool(self.conv3_3, 'pool3')
-
-        self.conv4_1 = self.conv_layer(self.pool3, "conv4_1")
-        self.conv4_2 = self.conv_layer(self.conv4_1, "conv4_2")
-        self.conv4_3 = self.conv_layer(self.conv4_2, "conv4_3")
-        self.pool4 = self.max_pool(self.conv4_3, 'pool4')
-
-        self.conv5_1 = self.conv_layer(self.pool4, "conv5_1")
-        self.conv5_2 = self.conv_layer(self.conv5_1, "conv5_2")
-        self.conv5_3 = self.conv_layer(self.conv5_2, "conv5_3")
-        self.pool5 = self.max_pool(self.conv5_3, 'pool5')
-
-        self.fc6 = self.fc_layer(self.pool5, "fc6")
-        assert self.fc6.get_shape().as_list()[1:] == [4096]
-        self.relu6 = tf.nn.relu(self.fc6)
-
-        self.fc7 = self.fc_layer(self.relu6, "fc7")
-        self.relu7 = tf.nn.relu(self.fc7)
-
-        self.fc8 = self.fc_layer(self.relu7, "fc8")
-
-        self.prob = tf.nn.softmax(self.fc8, name="prob")
-
-        self.data_dict = None
-        print(("build model finished: %ds" % (time.time() - start_time)))
-
-    def build_alter(self, x, batch_size, keep_prob):
+    def build(self, x, batch_size, keep_prob):
         """
         load variable from npy to build the VGG
         :param rgb: rgb image [batch, height, width, 3] values scaled [0, 1]
@@ -162,33 +99,19 @@ class Vgg16:
 
 
        # fcn layer
-        with tf.variable_scope('FCN_1'):
-            self.fcn_1 = self.fully_conv_layer(self.pool5, [1,1,512,4096], 1)
-            self.relu_1 = tf.nn.relu(self.fcn_1)
-            print('fcn2')
-            print(sess.run(tf.shape(self.relu_1)))
-        with tf.variable_scope('FCN_2'):
-            self.fcn_2 = self.fully_conv_layer(self.relu_1, [1,1,4096,4096], 1)
-            self.relu_2 = tf.nn.relu(self.fcn_2)
-            print('fcn1')
-            print(sess.run(tf.shape(self.relu_2)))        
+        self.fcn_1 = self.fully_conv_layer(self.pool5, [1,1,512,4096], 1,'fcn1')
+        print('fcn1')
+        print(sess.run(tf.shape(self.fcn_1)))
+        self.fcn_2 = self.fully_conv_layer(self.fcn_1, [1,1,4096,4096], 1, 'fcn2')
+        print('fcn2')
+        print(sess.run(tf.shape(self.fcn_2)))        
        
         #self.deconv3_1= self.deconv_layer(self.pool5 ,[8,8,256,512],[batch_size,112,112,256],4,"deconv3_1")
-        self.deconv3_1= self.deconv_layer(self.relu_2 ,[8,8,256,4096],[batch_size,112,112,256],4,"deconv3_1")
-        self.relu_3 = tf.nn.relu(self.deconv3_1)
+        self.deconv3_1= self.deconv_layer(self.fcn_2 ,[8,8,256,4096],[batch_size,112,112,256],4,"deconv3_1")
         print('deconv3_1')
-        print(sess.run(tf.shape(self.relu_3)))
+        print(sess.run(tf.shape(self.deconv3_1)))
         sess.close()
-        # self.fc6 = self.fc_layer(self.pool5, "fc6")
-        # assert self.fc6.get_shape().as_list()[1:] == [4096]
-        # self.relu6 = tf.nn.relu(self.fc6)
-        #
-        # self.fc7 = self.fc_layer(self.relu6, "fc7")
-        # self.relu7 = tf.nn.relu(self.fc7)
-        #
-        # self.fc8 = self.fc_layer(self.relu7, "fc8")
-        #
-        # self.prob = tf.nn.softmax(self.fc8, name="prob")
+
         self.data_dict = None
         # print(("build model finished: %ds" % (time.time() - start_time)))
         return self.deconv2_1, self.deconv3_1
@@ -202,15 +125,16 @@ class Vgg16:
     def max_pool_stride(self, bottom, stide, name):
         return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, stide, stide, 1], padding='SAME', name=name)
 
-    def fully_conv_layer(self, x, filtershape, stride):
-
-        filters = tf.get_variable(
-            name = 'weight',
-            shape = filtershape,
-            dtype = tf.float32,
-            initializer = tf.random_normal_initializer(mean=0,stddev=0.001),
-            trainable = True)
-        return tf.nn.conv2d(x, filters, [1, stride, stride, 1], padding= 'SAME')
+    def fully_conv_layer(self, x, filtershape, stride,name):
+        with tf.variable_scope(name):
+            filters = tf.get_variable(
+                name = 'weight',
+                shape = filtershape,
+                dtype = tf.float32,
+			    initializer = tf.random_normal_initializer(mean=0,stddev=0.001),
+                trainable = True)
+            output = tf.nn.conv2d(x, filters, [1, stride, stride, 1], padding= 'SAME')
+            return self.prelu(output)
 
     def conv_layer(self, bottom, keep_prob, name):
         with tf.variable_scope(name):
@@ -253,19 +177,22 @@ class Vgg16:
         return tf.Variable(self.data_dict[name][0], name="weights")
 
     def prelu(self, x):
-      alphas = tf.get_variable('alpha', x.get_shape()[-1],
-                           initializer=tf.constant_initializer(0.0),
-                            dtype=tf.float32)
-      pos = tf.nn.relu(x)
-      neg = alphas * (x - abs(x)) * 0.5
+        with tf.variable_scope('prelu'):
+            alphas = tf.get_variable('alpha', x.get_shape()[-1],
+							initializer=tf.constant_initializer(0.0),
+							dtype=tf.float32)
+            pos = tf.nn.relu(x)
+            neg = alphas * (x - abs(x)) * 0.5
 
-      return pos + neg
+            return pos + neg
+
     def deconv_layer(self, x, filtershape,output_shape, stride, name):
         with tf.variable_scope(name):
             filters = tf.get_variable(
-                name = 'weight',
-                shape = filtershape,
-                dtype = tf.float32,
-                initializer = tf.contrib.layers.xavier_initializer(),
-                trainable = True)
-            return tf.nn.conv2d_transpose(x, filters, output_shape, [1, stride, stride, 1], padding ='SAME')
+            name = 'weight',
+            shape = filtershape,
+            dtype = tf.float32,
+            initializer = tf.contrib.layers.xavier_initializer(),
+            trainable = True)
+            deconv_output= tf.nn.conv2d_transpose(x, filters, output_shape, [1, stride, stride, 1], padding ='SAME')
+            return self.prelu(deconv_output)

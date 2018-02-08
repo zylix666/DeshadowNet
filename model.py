@@ -81,12 +81,12 @@ class DeshadowNet:
         vgg = vgg16.Vgg16()
         print('making g-network')
         with tf.variable_scope('G_Net'):
-            A_input, S_input = vgg.build_alter(x, self.batch_size,keep_prob)
+            A_input, S_input = vgg.build(x, self.batch_size,keep_prob)
         print('finishing g-network')
         return A_input, S_input
 
     def A_Net(self,x,G_input,keep_prob): # after conv3 in G_Net  256
-        x = rgb2bgr(x)
+        #x = rgb2bgr(x)
         print('making a-network')
         sess=tf.Session()
         with tf.variable_scope('A_Net'):
@@ -164,7 +164,7 @@ class DeshadowNet:
             # deconv
             with tf.variable_scope('deconv2-2'):
                 x = deconv_layer(x,[4,4,3,64],[self.batch_size,224,224,3],2)
-                x = tf.nn.relu(x)
+                x = prelu(x)
             print('finishing a-network')
             print('deconv2-1')
             print(sess.run(tf.shape(x)))
@@ -172,7 +172,7 @@ class DeshadowNet:
         return x
 
     def S_Net(self,x,G_input,keep_prob): # after conv5 in G_Net 512
-        x = rgb2bgr(x)
+        #x = rgb2bgr(x)
         print('making s-network')
         sess = tf.Session()
         with tf.variable_scope('S_Net'):
@@ -248,7 +248,7 @@ class DeshadowNet:
             # deconv
             with tf.variable_scope('decov3-2'):
                 x = deconv_layer(x,[4,4,3,64],[self.batch_size,224,224,3],2)
-                x = tf.nn.relu(x)
+                x = prelu(x)
             print('decov3-2')
             print(sess.run(tf.shape(x)))
         print('finishing s-network')

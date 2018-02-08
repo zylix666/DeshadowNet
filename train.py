@@ -8,7 +8,7 @@ from tfrecord_utils import *
 from tensorflow.python import debug as tf_debug
 
 IMAGE_SIZE = 224 # 64 128 224
-BATCH_SIZE = 3
+BATCH_SIZE = 2
 EPOCH = 500
 INIT_G_LEARNING_RATE = 1E-5 #1E-5
 INIT_LEARNING_RATE = 1E-4 #1E-4
@@ -195,7 +195,7 @@ def train(backupFlag):
                         # print('loss: {}'.format(loss))
                         loss_val += loss
                         # write log
-                        writer.add_summary(summary, (sess.run(epoch) -1)*step_num* BATCH_SIZE+i)
+                        writer.add_summary(summary, (sess.run(epoch) -1)*step_num+i)
 
 
                         if i == int(step_num/2) or i == int(step_num -1):
@@ -247,8 +247,9 @@ def train(backupFlag):
 
                     #summary = sess.run(summary_op)
                     # decay learning rate
-                    LEARNING_RATE = lr_decay(INIT_LEARNING_RATE, 1, sess.run(epoch))
-                    G_LEARNING_RATE = lr_decay(INIT_G_LEARNING_RATE, 1, sess.run(epoch))
+                    if sess.run(epoch) % 40:
+                        LEARNING_RATE = lr_decay(INIT_LEARNING_RATE, 1, sess.run(epoch))
+                        G_LEARNING_RATE = lr_decay(INIT_G_LEARNING_RATE, 1, sess.run(epoch))
 
 
 
@@ -282,6 +283,7 @@ def image_show(np_image):
 
 def lr_decay(lr_input, decay_rate,num_epoch):
     return lr_input / (1 + decay_rate*num_epoch)
+
 if __name__ == '__main__':
     # make_tfrecord()
     train(True)

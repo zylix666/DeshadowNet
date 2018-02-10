@@ -26,7 +26,13 @@ Run the command line:
 > tensorboard --logdir=./graph/logs
 '''
 
+'''
+TODO
+1. data needs to be normlized 
+2. make the test set smaller like 20 or 30
+3. make the test set image size smaller
 
+'''
 
 def make_tfrecord():
     # make test set
@@ -108,13 +114,6 @@ def train(backupFlag):
 
         with tf.name_scope('Momentum_Opt'):
             print('init optimization')
-            # opt_g = tf.train.MomentumOptimizer(G_LEARNING_RATE, MOMENTUM)
-            # train_g_op = opt_g.minimize(model.loss, var_list = model.g_net_variables)
-            # opt_a = tf.train.MomentumOptimizer(LEARNING_RATE, MOMENTUM)
-            # train_as_op = opt_a.minimize(model.loss, var_list = model.a_net_variables)
-            # opt_s = tf.train.MomentumOptimizer(LEARNING_RATE, MOMENTUM)
-            # train_as_op = opt_s.minimize(model.loss, var_list = model.s_net_variables)
-            # train_op = tf.group(train_g_op,train_as_op)
             opt_g = tf.train.MomentumOptimizer(lr_g, MOMENTUM)
             train_g_op = opt_g.minimize(model.loss, var_list = model.g_net_variables)
             opt_a = tf.train.MomentumOptimizer(lr, MOMENTUM)
@@ -144,10 +143,22 @@ def train(backupFlag):
         sess.run([init_op,init_local_op])
         threads = tf.train.start_queue_runners(coord = coord)
 
+		# parameter
         tf.summary.scalar('epoch',epoch)
         tf.summary.scalar('loss',model.loss)
         tf.summary.scalar('lr_as',lr)
         tf.summary.scalar('lr_g',lr_g)
+
+		# images
+        tf.summary.image('F_matte',model.shadow_matte)
+        tf.summary.image('GT_matte',model.gt_shadow_matte)
+        tf.summary.image('F_free',model.f_shadowfree)
+        tf.summary.image('GT_free',model.gt_shadowfree)
+
+        tf.summary.image('A_input',model.A_input[:,:,:,0:3])
+        tf.summary.image('S_input',model.S_input[:,:,:,0:3])
+        tf.summary.image('A_output',model.A_output)
+        tf.summary.image('S_output',model.S_output)
 
         summary_op = tf.summary.merge_all()
         print('start training ...')
@@ -180,9 +191,6 @@ def train(backupFlag):
                         img_input_seq = img_input_seq.astype(np.float)
                         img_gt_seq = img_gt_seq.astype(np.float)
 
-                        ## normalize
-                        #img_input_seq = normalize_img(img_input_seq, BATCH_SIZE)
-                        #img_gt_seq = normalize_img(img_gt_seq, BATCH_SIZE)
 
                         _,loss,summary = sess.run([train_op,model.loss,summary_op],
                                             feed_dict={
@@ -198,7 +206,7 @@ def train(backupFlag):
                         writer.add_summary(summary, (sess.run(epoch) -1)*step_num+i)
 
 
-                        if i == int(step_num/2) or i == int(step_num -1):
+                        if i == int(step_num -1):
                             A, S = sess.run([model.A_input,model.S_input],
                                     feed_dict={
                                     shadow: img_input_seq,
@@ -209,8 +217,7 @@ def train(backupFlag):
                                     })
                             A.reshape([BATCH_SIZE,112,112,256])
                             S.reshape([BATCH_SIZE,112,112,256])
-                            #image_show(A[0,:,:,0])
-                            #image_show(A[0,:,:,0])
+
                             np.savetxt('./output/a_out/A{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), A[0,:,:,0], delimiter=',')   # X is an array
                             np.savetxt('./output/s_out/S{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), S[0,:,:,0], delimiter=',')   # X is an array
 
@@ -228,6 +235,8 @@ def train(backupFlag):
                                                             lr: LEARNING_RATE,
                                                             lr_g:G_LEARNING_RATE
                                                             })
+                    #np.savetxt('./output/f_shadow/f_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), f_shadow_free[0,:,:,:], delimiter=',')   # X is an array
+                    #np.savetxt('./output/gt_shadow/gt_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), gt_shadow_free[0,:,:,:], delimiter=',')   # X is an array					
                     # find
                     out = f_shadow_free[0].astype(np.uint8)
                     gt = gt_shadow_free[0].astype(np.uint8)
@@ -237,8 +246,8 @@ def train(backupFlag):
                     image_show(out)
                     image_show(gt)
 
-                    cv2.imwrite('./output/f_shadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(out, cv2.COLOR_RGB2BGR))
-                    cv2.imwrite('./output/gt_shadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(gt, cv2.COLOR_RGB2BGR))
+                    #cv2.imwrite('./output/f_shadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(out, cv2.COLOR_RGB2BGR))
+                    #cv2.imwrite('./output/gt_shadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(gt, cv2.COLOR_RGB2BGR))
                     # saving data
                     saver = tf.train.Saver()
                     saver.save(sess, './backup/latest', write_meta_graph = False)
@@ -247,10 +256,10 @@ def train(backupFlag):
 
                     #summary = sess.run(summary_op)
                     # decay learning rate
-                    if sess.run(epoch) % 40:
+                    if (sess.run(epoch) % 3) == 0:
                         LEARNING_RATE = lr_decay(INIT_LEARNING_RATE, 1, sess.run(epoch))
                         G_LEARNING_RATE = lr_decay(INIT_G_LEARNING_RATE, 1, sess.run(epoch))
-
+                        print('decreasing learning rate ...')
 
 
                 else:
@@ -265,18 +274,6 @@ def train(backupFlag):
             coord.request_stop()
             coord.join(threads)
 
-def normalize_img(x, batch_size):
-
-    norm_img_batch=[]
-    for i in range(batch_size):
-        norm_img = x[i]/ 255.0
-        x[i] = norm_img
-    return x
-
-def unnorm_img(img):
-    img = img * 255.0
-    return img.astype(np.uint8)
-
 def image_show(np_image):
     img = Image.fromarray(np_image,'RGB')
     img.show()
@@ -286,4 +283,4 @@ def lr_decay(lr_input, decay_rate,num_epoch):
 
 if __name__ == '__main__':
     # make_tfrecord()
-    train(True)
+    train(False)

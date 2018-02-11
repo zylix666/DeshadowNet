@@ -14,6 +14,8 @@ def conv_layer(x, filtershape, stride, name):
         bias = tf.nn.bias_add(conv, conv_biases)
         output = prelu(bias)
         #output = tf.nn.dropout(prelu, keep_prob=keep_prob)
+        img_filt = tf.reshape(filters[:,:,:,1], [-1,filtershape[0],filtershape[1],1])
+        tf.summary.image('conv_filter',img_filt)
         return output
 
 def deconv_layer(x, filtershape,output_shape, stride, name):
@@ -30,6 +32,8 @@ def deconv_layer(x, filtershape,output_shape, stride, name):
         #bias = tf.nn.bias_add(deconv, deconv_biases)
         #output = prelu(bias)
         #output = tf.nn.dropout(prelu, keep_prob=keep_prob)
+        img_filt = tf.reshape(filters[:,:,:,1], [-1,filtershape[0],filtershape[1],1])
+        tf.summary.image('deconv_filter',img_filt)
         return prelu(deconv)
 
 def max_pool_layer(x,filtershape,stride,name):

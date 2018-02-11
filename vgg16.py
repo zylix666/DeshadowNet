@@ -20,6 +20,7 @@ class Vgg16:
             print('path to the weight of vgg: {}'.format(path))
 
         self.data_dict = np.load(vgg16_npy_path, encoding='latin1').item()
+        print(self.data_dict)
         print("npy file loaded")
 
     def build(self, x, batch_size, keep_prob):
@@ -98,6 +99,25 @@ class Vgg16:
         sess.close()
 
         self.data_dict = None
+
+        tf.summary.image('conv1',self.pool1[:,:,:,0:3])
+        tf.summary.image('conv2',self.pool2[:,:,:,0:3])
+        tf.summary.image('conv3',self.pool3[:,:,:,0:3])
+        tf.summary.image('conv4',self.pool4[:,:,:,0:3])
+        tf.summary.image('conv5',self.pool5[:,:,:,0:3])
+        tf.summary.image('conv5',self.pool5[:,:,:,0:3])
+        red = tf.reshape(self.deconv2_1[:,:,:,0], [-1,112,112,1])
+        green = tf.reshape(self.deconv2_1[:,:,:,1], [-1,112,112,1])
+        blue = tf.reshape(self.deconv2_1[:,:,:,2], [-1,112,112,1])
+        tf.summary.image('deconv2_1',red)
+        tf.summary.image('deconv2_1',green)
+        tf.summary.image('deconv2_1',blue)
+        red = tf.reshape(self.deconv3_1[:,:,:,0], [-1,112,112,1])
+        green = tf.reshape(self.deconv3_1[:,:,:,1], [-1,112,112,1])
+        blue = tf.reshape(self.deconv3_1[:,:,:,2], [-1,112,112,1])
+        tf.summary.image('deconv3_1',red)
+        tf.summary.image('deconv3_1',green)
+        tf.summary.image('deconv3_1',blue)
         return self.deconv2_1, self.deconv3_1
 
     def max_pool_stride(self, bottom, stide, name):

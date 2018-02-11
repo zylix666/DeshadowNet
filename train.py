@@ -9,13 +9,13 @@ from tensorflow.python import debug as tf_debug
 
 IMAGE_SIZE = 224 # 64 128 224
 BATCH_SIZE = 2
-EPOCH = 500
-INIT_G_LEARNING_RATE = 1E-5 #1E-5
-INIT_LEARNING_RATE = 1E-4 #1E-4
+EPOCH = 50000000
+INIT_G_LEARNING_RATE = 1e-5 #1E-5
+INIT_LEARNING_RATE = 1e-4 #1E-4
 MOMENTUM = 0.9
 
 log_path = './graph/logs' # path to tensorboard graph
-tfrecord_name = 'data.tfrecord'
+TFRECORD_NAME = 'smalldata.tfrecord'
 
 # momentum to 0.9 and
 # weight decay to 0.0005 (at this point we do not include)
@@ -56,7 +56,7 @@ def make_tfrecord():
 
     # writing tf record
     print('tf record writing start')
-    tfrecord_filename = './data.tfrecord'
+    tfrecord_filename = TFRECORD_NAME
     writer = tf.python_io.TFRecordWriter(tfrecord_filename)
 
     index = 0
@@ -84,7 +84,7 @@ def train(backupFlag):
     tf.reset_default_graph()
 
     #calc step number
-    step_num = int(408 / BATCH_SIZE)
+    step_num = int(6 / BATCH_SIZE)
 
     # place holders for shadow image input and shadow free image input
     with tf.variable_scope('Data_Input'):
@@ -125,7 +125,7 @@ def train(backupFlag):
 
         # loading dataset ...
         reader = tf.TFRecordReader()
-        img_input, img_gt = read_tfrecord_pair_img(reader, tfrecord_name, False)
+        img_input, img_gt = read_tfrecord_pair_img(reader, TFRECORD_NAME, False)
 
         coord = tf.train.Coordinator()
 
@@ -154,11 +154,6 @@ def train(backupFlag):
         tf.summary.image('GT_matte',model.gt_shadow_matte)
         tf.summary.image('F_free',model.f_shadowfree)
         tf.summary.image('GT_free',model.gt_shadowfree)
-
-        tf.summary.image('A_input',model.A_input[:,:,:,0:3])
-        tf.summary.image('S_input',model.S_input[:,:,:,0:3])
-        tf.summary.image('A_output',model.A_output)
-        tf.summary.image('S_output',model.S_output)
 
         summary_op = tf.summary.merge_all()
         print('start training ...')
@@ -207,7 +202,7 @@ def train(backupFlag):
 
 
                         if i == int(step_num -1):
-                            A, S = sess.run([model.A_input,model.S_input],
+                            A, S,SM,GT_SM = sess.run([model.A_output,model.S_output,model.shadow_matte,model.gt_shadow_matte],
                                     feed_dict={
                                     shadow: img_input_seq,
                                     shadow_free:  img_gt_seq,
@@ -215,11 +210,14 @@ def train(backupFlag):
                                     lr: LEARNING_RATE,
                                     lr_g:G_LEARNING_RATE
                                     })
-                            A.reshape([BATCH_SIZE,112,112,256])
-                            S.reshape([BATCH_SIZE,112,112,256])
-
+                            A.reshape([BATCH_SIZE,224,224,3])
+                            S.reshape([BATCH_SIZE,224,224,3])
+                            SM.reshape([BATCH_SIZE,224,224,3])
+                            GT_SM.reshape([BATCH_SIZE,224,224,3])
                             np.savetxt('./output/a_out/A{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), A[0,:,:,0], delimiter=',')   # X is an array
                             np.savetxt('./output/s_out/S{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), S[0,:,:,0], delimiter=',')   # X is an array
+                            np.savetxt('./output/sm_out/SM{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), SM[0,:,:,0], delimiter=',')   # X is an array
+                            np.savetxt('./output/sm_gt_out/GT_SM{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), GT_SM[0,:,:,0], delimiter=',')   # X is an array
 
 
 
@@ -227,24 +225,24 @@ def train(backupFlag):
 
                     # check for validation
                     # find shadow matte
-                    f_shadow_free, gt_shadow_free = sess.run([model.f_shadowfree,model.gt_shadowfree],
-                                                            feed_dict={
-                                                            shadow: img_input_seq,
-                                                            shadow_free: img_gt_seq,
-                                                            keep_prob: 1.0,
-                                                            lr: LEARNING_RATE,
-                                                            lr_g:G_LEARNING_RATE
-                                                            })
+                    #f_shadow_free, gt_shadow_free = sess.run([model.f_shadowfree,model.gt_shadowfree],
+                    #                                        feed_dict={
+                    #                                        shadow: img_input_seq,
+                    #                                        shadow_free: img_gt_seq,
+                    #                                        keep_prob: 1.0,
+                    #                                        lr: LEARNING_RATE,
+                    #                                        lr_g:G_LEARNING_RATE
+                    #                                        })
                     #np.savetxt('./output/f_shadow/f_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), f_shadow_free[0,:,:,:], delimiter=',')   # X is an array
                     #np.savetxt('./output/gt_shadow/gt_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), gt_shadow_free[0,:,:,:], delimiter=',')   # X is an array					
                     # find
-                    out = f_shadow_free[0].astype(np.uint8)
-                    gt = gt_shadow_free[0].astype(np.uint8)
-                    np.savetxt('./output/f_shadow/f_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), out[:,:,0], delimiter=',')
-                    np.savetxt('./output/gt_shadow/gt_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), gt[:,:,0], delimiter=',')
+                    #out = f_shadow_free[0].astype(np.uint8)
+                    #gt = gt_shadow_free[0].astype(np.uint8)
+                    #np.savetxt('./output/f_shadow/f_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), out[:,:,0], delimiter=',')
+                    #np.savetxt('./output/gt_shadow/gt_shadow{}.out'.format("{0:06d}".format((sess.run(epoch) -1)*step_num* BATCH_SIZE+i)), gt[:,:,0], delimiter=',')
 
-                    image_show(out)
-                    image_show(gt)
+                    #image_show(out)
+                    #image_show(gt)
 
                     #cv2.imwrite('./output/f_shadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(out, cv2.COLOR_RGB2BGR))
                     #cv2.imwrite('./output/gt_shadow/{}.jpg'.format("{0:06d}".format(sess.run(epoch))), cv2.cvtColor(gt, cv2.COLOR_RGB2BGR))
@@ -254,9 +252,8 @@ def train(backupFlag):
                     if sess.run(epoch) == EPOCH:
                         saver.save(sess,'./backup/fully_trained',write_meta_graph = False)
 
-                    #summary = sess.run(summary_op)
                     # decay learning rate
-                    if (sess.run(epoch) % 3) == 0:
+                    if (sess.run(epoch) % 200) == 0:
                         LEARNING_RATE = lr_decay(INIT_LEARNING_RATE, 1, sess.run(epoch))
                         G_LEARNING_RATE = lr_decay(INIT_G_LEARNING_RATE, 1, sess.run(epoch))
                         print('decreasing learning rate ...')
@@ -282,5 +279,5 @@ def lr_decay(lr_input, decay_rate,num_epoch):
     return lr_input / (1 + decay_rate*num_epoch)
 
 if __name__ == '__main__':
-    # make_tfrecord()
+    make_tfrecord()
     train(False)
